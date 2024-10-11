@@ -1,0 +1,22 @@
+{
+	"id": "massAction",
+	"name": "MassAction",
+	"pluginVersion": "0.1",
+	"description": {
+		"fr_FR": "Plugin pour lancer des actions sur plusieurs équipements en même temps"
+	},
+	"licence": "AGPL",
+	"author": "Codemate SARL",
+	"require": "4.3",
+	"category": "automation protocol",
+	"hasDependency": true,
+	"hasOwnDeamon": false,
+	"maxDependancyInstallTime": 0,
+	"changelog_beta": "",
+	"changelog": "https://github.com/nicolas-codemate/jeedom-massAction/blob/main/docs/fr_FR/changelog.md",
+	"documentation": "https://github.com/nicolas-codemate/jeedom-massAction/blob/main/README.md",
+	"language": [
+		"fr_FR"
+	],
+	"compatibility": ""
+}
