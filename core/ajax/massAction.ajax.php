@@ -49,6 +49,71 @@ function findTopicForEqLogic(eqLogic $eqLogic): ?string
     return $topic;
 }
 
+/**
+ * @param jMQTT[] $jMQTTs
+ */
+function buildTree(jeeObject $parentObject, array $jMQTTs): array
+{
+    $equipments = buildEquipments($parentObject, $jMQTTs);
+
+    $toReturn = [
+        'id' => $parentObject->getId(),
+//                    'name' => str_repeat('&nbsp;&nbsp;', $object->getConfiguration('parentNumber')).$object->getName(),
+        'name' => $parentObject->getName(),
+        'equipments' => $equipments,
+        'child' => [],
+    ];
+
+    $countEquipments = count($equipments);
+    foreach ($parentObject->getChild() as $child) {
+        $child = buildTree($child, $jMQTTs);
+        $toReturn['child'][] = $child;
+        $countEquipments += $child['countEquipments'];
+    }
+
+    $toReturn['countEquipments'] = $countEquipments;
+
+    return $toReturn;
+}
+
+/**
+ * @param jMQTT[] $jMQTTs
+ */
+function buildEquipments(jeeObject $parentObject, array $jMQTTs): array
+{
+    $equipments = [];
+    foreach ($jMQTTs as $jMQTT) {
+        if ($jMQTT->getObject_id() === $parentObject->getId()) {
+            $equipmentToAdd = [
+                'id' => $jMQTT->getId(),
+                'name' => $jMQTT->getHumanName(true, true),
+                'icon' => $jMQTT->getConfiguration('icone'),
+                'values' => [],
+            ];
+
+            /** @var cmd[] $commands */
+            $commands = $jMQTT->getCmd('info', null, true);
+            foreach ($commands as $command) {
+                /** @var history[] $history */
+                $history = $command->getHistory();
+                $latestHistory = end($history);
+                if(false === $latestHistory) {
+                    continue;
+                }
+                $equipmentToAdd['values'][$command->getName()] = [
+                    'value' => $latestHistory->getValue(),
+                    'timestamp' => $latestHistory->getDatetime(),
+                ];
+            }
+
+            $equipments[] = $equipmentToAdd;
+        }
+    }
+
+//    $equipments['total'] = count($equipments);
+
+    return $equipments;
+}
 
 try {
     require_once dirname(__FILE__).'/../../../../core/php/core.inc.php';
@@ -87,30 +152,20 @@ try {
 
             $parentObjectId = init('parentObjectId');
 
-            /** @var jeeObject $parentObject */
-            $parentObject = jeeObject::byId($parentObjectId);
-            if (null === $parentObject) {
-                ajax::success([]);
-            }
-
-            // collect all child objects ids
-            $objectIds = array_map(static function (jeeObject $object) {
-                return $object->getId();
-            }, $parentObject->getChilds());
-            // add parent object id
-            $objectIds[] = $parentObject->getId();
-
-            $toReturn = [];
-            foreach ($jMQTTs as $jMQTT) {
-                if (\in_array($jMQTT->getObject_id(), $objectIds)) {
-                    $toReturn[] = [
-                        'id' => $jMQTT->getId(),
-                        'name' => $jMQTT->getName(),
-                    ];
+            if (empty($parentObjectId)) {
+                /** @var jeeObject $parentObject */
+                $parentObject = jeeObject::rootObject(false, true);
+            } else {
+                /** @var jeeObject $parentObject */
+                $parentObject = jeeObject::byId($parentObjectId);
+                if (null === $parentObject) {
+                    ajax::success([]);
                 }
             }
 
-            ajax::success($toReturn);
+            $objects = buildTree($parentObject, $jMQTTs);
+
+            ajax::success($objects);
 
             return;
         }
