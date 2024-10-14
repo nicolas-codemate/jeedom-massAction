@@ -19,11 +19,11 @@ $(function () {
             const $selectedEquipments = $('#selectedEquipments');
             const $acceptButton = $('.bootbox-accept');
             if ($selectedEquipments.value().length > 0) {
-                $('#screenForm').show();
+                $('#actionForm').show();
                 $acceptButton.removeAttr('disabled');
                 $acceptButton.removeClass('disabled');
             } else {
-                $('#screenForm').hide();
+                $('#actionForm').hide();
                 $acceptButton.attr('disabled', 'disabled');
                 $acceptButton.addClass('disabled');
             }
@@ -43,14 +43,68 @@ $(function () {
             $selectedEquipments.multiselect('refresh');
         }
 
+        const buildEquipementsSelect = async function () {
+            resetEquipementSelect();
+            const brokerId = $('#jmqttBrkSelector').val();
+            const parentObjectSelectorId = $('#parentObjectSelector').val();
+
+            if (brokerId === '' || parentObjectSelectorId === '') {
+                return;
+            }
+
+            const filterEquipments = function (jeeObject) {
+                let equipments = [];
+                if (jeeObject.equipments.length > 0) {
+                    equipments = jeeObject.equipments;
+                }
+
+                if (jeeObject.child.length > 0) {
+                    jeeObject.child.forEach(child => {
+                        equipments.push(...filterEquipments(child));
+                    });
+                }
+
+                return equipments;
+            }
+
+            const equipmentsData = await searchEquipments(brokerId, parentObjectSelectorId);
+            const equipments = filterEquipments(equipmentsData.result);
+
+            $.each(equipments, function (key, obj) {
+                const $selectedEquipments = $('#selectedEquipments');
+                $selectedEquipments.append(`<option value="${obj.id}">${obj.name}</option>`);
+            });
+
+            rebuildEquipementSelect();
+
+            const commands = equipments.reduce((acc, equipment) => {
+                equipment.commands.forEach(command => acc.add(command));
+                return acc;
+            }, new Set());
+
+            // order set alphabetically
+            const allCommands = Array.from(commands).sort();
+
+            const $commandSelector = $('#commandSelector');
+            $commandSelector.empty();
+            $commandSelector.append('<option value="">{{Aucune}}</option>');
+            allCommands.forEach(command => {
+                $commandSelector.append(`<option value="${command}">${command}</option>`);
+            });
+        };
+
         const buildObject = function (jeeObject) {
 
             const state = jeeObject?.values["etat"]?.value || '{{Inconnu}}';
 
+            // TODO add timestamp of latest value as a tooltip
+            // TODO implement "Action" button.
+            // TODO best scenario, I would like to add every object even if there is no equipements to add the ability to click action button and open modal with all child equipements already selected
+            // TODO create a timeout function that could refresh latest values
             return `
 <div class="eqLogicDisplayCard cursor displayAsTable" data-object="${jeeObject.id}">
     <img class="lazy" src="plugins/jMQTT/core/img/node_${jeeObject.icon}.svg">
-    <span class="name">${jeeObject.name}</span>
+    <span class="name">${jeeObject.humanName}</span>
     <span class="hiddenAsCard input-group displayTableRight" style="font-size:12px">
         <span class="label label-${state === 'Inconnu' ? 'danger' : 'primary'}">
         ${state}
@@ -60,15 +114,6 @@ $(function () {
 </div>
 `;
         }
-
-        const buildEquipments = function (jeeObject) {
-            return `
-<div class="objectDisplayCard displayAsTable cursor" data-object_id="${jeeObject.id}" data-object_name="${jeeObject.name}">
-    <span class="name">${jeeObject.name}</span>
-</div>
-`;
-        }
-
 
         const searchEquipments = async function (brokerId, parentObjectId) {
             if (!brokerId) {
@@ -123,13 +168,10 @@ $(function () {
             }
 
             const equipments = buildEquipments(data.result);
-            console.log(equipments);
             container.append(equipments);
-
-                // container.append(buildObject(data.result));
         });
 
-        $('.eqLogicAction[data-action=updateScreen]').off('click').on('click', function () {
+        $('.eqLogicAction[data-action=massAction]').off('click').on('click', async function () {
             let dialog_message = '';
 
             dialog_message += '<form id="ajaxForm">';
@@ -167,57 +209,26 @@ $(function () {
     <br/>
     `;
 
-            dialog_message += '<div id="screenForm" style="display: none;">';
+            dialog_message += '<div id="actionForm" style="display: none;">';
 
             dialog_message += `
         <div class="row">
-            <div class="form-group col-md-3">
-                <input class="form-check-input" type="radio" name="template" id="template1" value="1" checked>
-                <label class="form-check-label" for="template2">Template 1</label>
-            </div>
-            <div class="form-group col-md-3">
-                <input class="form-check-input" type="radio" name="template" id="template2" value="2" >
-                <label class="form-check-label" for="template1">Template 2</label>
+            <div class="form-group col-md-12">
+                <label for="commandSelector" class="control-label">{{Commandes}}</label>
+                <select class="bootbox-input bootbox-input-select form-control" id="commandSelector" name="commandName">
+                    <option value="">{{Aucune}}</option>
+                </select>
             </div>
         </div>
         <br/>
         `;
-
-            // add fields TEXT 1 to 9
-            for (let i = 1; i <= 9; i++) {
-                if (i % 3 === 1) {
-                    dialog_message += '<div class="row">';
-                }
-                dialog_message += '<div class="col-md-4">';
-                dialog_message += `<label for="text_${i}" class="control-label">Texte ${i}</label>`;
-                dialog_message += `<input type="text" class="bootbox-input bootbox-input-text form-control" autocomplete="nope" id="text_${i}" name="text_${i}" >`;
-                dialog_message += '</div>';
-                if (i % 3 === 0) {
-                    dialog_message += '</div>';
-                }
-            }
-            if (9 % 3 !== 0) {
-                dialog_message += '</div>';
-            }
-            dialog_message += `
-            <div class="row">
-                <div class="col-md-4">
-                    <label class="control-label" for="text_10">Texte 10</label>
-                    <input type="text" class="bootbox-input bootbox-input-file form-control" autocomplete="nope" id="text_10" name="text_10">
-                </div>
-                <div class="col-md-8">
-                    <label class="control-label" for="qrcode">{{QR Code}}</label>
-                    <input type="text" class="bootbox-input bootbox-input-text form-control" id="qrcode" name="qrcode">
-               </div>
-            </div>
-    `;
 
             dialog_message += '</div>';
 
             dialog_message += '</form>';
 
             bootbox.confirm({
-                title: "{{Mise à jour des écrans}}",
+                title: "{{Envoyer les commandes}}",
                 message: dialog_message,
                 buttons: {
                     confirm: {
@@ -229,14 +240,14 @@ $(function () {
                         className: 'btn-danger'
                     }
                 },
-                onShown: function () {
-                    $('#jmqttBrkSelector, #parentObjectSelector').bind('change', function () {
-                        searchEquipment();
-                    });
-
-                    toggleCommandForm();
+                onShown: async function () {
                     $('#selectedEquipments').multiselect({
                         includeSelectAllOption: true,
+                    });
+                    toggleCommandForm();
+                    $('#jmqttBrkSelector, #parentObjectSelector').bind('change', async function () {
+                        await buildEquipementsSelect();
+                        toggleCommandForm();
                     });
                 },
                 callback: function (result) {
@@ -253,7 +264,7 @@ $(function () {
                     $acceptButton.html('Envoi en cours...');
 
                     const formData = new FormData(document.forms['ajaxForm']);
-                    formData.append('action', 'updateDisplay');
+                    formData.append('action', 'sendCommands');
                     $.ajax({
                         url: 'plugins/massAction/core/ajax/massAction.ajax.php',
                         type: 'POST',
@@ -271,7 +282,7 @@ $(function () {
 
                                 return;
                             }
-                            $.fn.showAlert({message: 'Modifications envoyées', level: 'success'});
+                            $.fn.showAlert({message: 'Commandes envoyées', level: 'success'});
                         },
                         cache: false,
                         contentType: false,

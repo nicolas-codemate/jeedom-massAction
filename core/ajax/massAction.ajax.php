@@ -58,6 +58,7 @@ function buildTree(jeeObject $parentObject, array $jMQTTs): array
 
     $toReturn = [
         'id' => $parentObject->getId(),
+        // TODO maybe add all the parent object name to create some kind of hierarchy
 //                    'name' => str_repeat('&nbsp;&nbsp;', $object->getConfiguration('parentNumber')).$object->getName(),
         'name' => $parentObject->getName(),
         'equipments' => $equipments,
@@ -86,25 +87,37 @@ function buildEquipments(jeeObject $parentObject, array $jMQTTs): array
         if ($jMQTT->getObject_id() === $parentObject->getId()) {
             $equipmentToAdd = [
                 'id' => $jMQTT->getId(),
-                'name' => $jMQTT->getHumanName(true, true),
+                'name' => $jMQTT->getName(),
+                'humanName' => $jMQTT->getHumanName(true, true),
                 'icon' => $jMQTT->getConfiguration('icone'),
                 'values' => [],
+                'commands' => [],
             ];
 
             /** @var cmd[] $commands */
-            $commands = $jMQTT->getCmd('info', null, true);
+            $commands = $jMQTT->getCmd(null, null, true);
             foreach ($commands as $command) {
-                /** @var history[] $history */
-                $history = $command->getHistory();
-                $latestHistory = end($history);
-                if(false === $latestHistory) {
-                    continue;
+                if ($command->getType() === 'info') {
+                    /** @var history[] $history */
+                    $history = $command->getHistory();
+                    $latestHistory = end($history);
+                    if (false === $latestHistory) {
+                        continue;
+                    }
+                    $equipmentToAdd['values'][$command->getName()] = [
+                        'value' => $latestHistory->getValue(),
+                        'timestamp' => $latestHistory->getDatetime(),
+                    ];
                 }
-                $equipmentToAdd['values'][$command->getName()] = [
-                    'value' => $latestHistory->getValue(),
-                    'timestamp' => $latestHistory->getDatetime(),
-                ];
+
+                if($command->getType() === 'action') {
+                    // use key to ensure unicity in command name
+                    $equipmentToAdd['commands'][$command->getName()] = $command->getName();
+                }
             }
+
+            // drop the key
+            $equipmentToAdd['commands'] = array_values($equipmentToAdd['commands']);
 
             $equipments[] = $equipmentToAdd;
         }
@@ -128,7 +141,7 @@ try {
     $action = init('action');
 
     switch ($action) {
-        case "TO_DEFINE":
+        case "sendCommands":
         {
             $hasError = false;
 

@@ -7,11 +7,6 @@ if (!isConnect('admin')) {
 $plugin = plugin::byId('massAction');
 sendVarToJS('eqType', $plugin->getId());
 
-
-/** @var jMQTT[][] $eqNonBrokers */
-$eqNonBrokers = jMQTT::getNonBrokers();
-
-
 $eqBrokers = jMQTT::getBrokers();
 $eqBrokersName = [];
 foreach ($eqBrokers as $brokerId => $broker) {
@@ -28,22 +23,6 @@ foreach (jeeObject::buildTree() as $object) {
 }
 
 sendVarToJS('objects', $objects);
-
-/**
- *
- * @param jMQTT $eqL
- */
-function displayEqLogicCard($eqL)
-{
-    echo '<div class="eqLogicDisplayCard displayAsTable cursor" data-eqLogic_id="'.$eqL->getId().'" jmqtt_type="'.$eqL->getType().'">';
-    if ($eqL->getType() !== 'brk') {
-        echo '<img class="lazy" src="plugins/jMQTT/core/img/node_broker.svg" />';
-    } else {
-        echo '<img class="lazy" src="plugins/jMQTT/core/img/node_.svg" />';
-    }
-    echo '<span class="name">'.$eqL->getHumanName(true, true).'</span>';
-    echo '<span class="input-group displayTableRight" style="font-size:12px"></span></div>'."\n";
-}
 
 ?>
 
@@ -77,40 +56,6 @@ function displayEqLogicCard($eqL)
                 ?>
             </select>
         </div>
-
-        <?php
-        // Check if there are orphans first
-        //        $has_orphans = false;
-        //        foreach ($eqNonBrokers as $id => $nonBrokers) {
-        //            if (!isset($eqBrokers[$id])) {
-        //                if (!$has_orphans) {
-        //                    echo '<div class="eqLogicThumbnailContainer">';
-        //                    echo '<legend class="danger"><i class="fas fa-table"></i> {{Mes Equipements orphelins}}&nbsp;<sup>';
-        //                    echo '<i class="fas fa-exclamation-triangle tooltips" title="';
-        //                    echo '{{Ces équipements ne sont associés à aucun broker et ne peuvent donc pas communiquer.}}<br/>';
-        //                    echo '{{Il ne devrait pas y avoir un seul orphelin : supprimez-les ou rattachez-les à un broker.}}"></i></sup></legend>';
-        //                    $has_orphans = true;
-        //                }
-        //                foreach ($nonBrokers as $eqL) {
-        //                    displayEqLogicCard($eqL);
-        //                }
-        //            }
-        //        }
-        //        if ($has_orphans) {
-        //            echo '</div>';
-        //        }
-
-        //        foreach ($eqBrokers as $eqB) {
-        //            $nbEq = count($eqNonBrokers[$eqB->getId()]);
-        //            echo '<legend><i class="fas fa-table"></i> {{Mes Equipements sur le broker}} <b>'.$eqB->getName().'</b> ('.$nbEq.')</legend>';
-        //            echo '<div class="eqLogicThumbnailContainer">';
-        ////            displayEqLogicCard($eqB);
-        //            foreach ($eqNonBrokers[$eqB->getId()] as $eqL) {
-        //                displayEqLogicCard($eqL);
-        //            }
-        //            echo '</div>';
-        //        }
-        ?>
         <div class="eqLogicThumbnailContainer" id="eqLogicThumbnailContainer">
             <legend>
                 <i class="fas fa-table"></i> {{Mes Equipements sur le broker}}
@@ -128,4 +73,5 @@ include_file('desktop', 'bootstrap-multiselect', 'css', 'massAction');
 
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php
-include_file('core', 'plugin.template', 'js'); ?>
+include_file('core', 'plugin.template', 'js');
+?>
