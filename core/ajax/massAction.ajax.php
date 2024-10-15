@@ -110,7 +110,7 @@ function buildEquipments(jeeObject $parentObject, array $jMQTTs): array
                     ];
                 }
 
-                if($command->getType() === 'action') {
+                if ($command->getType() === 'action') {
                     // use key to ensure unicity in command name
                     $equipmentToAdd['commands'][$command->getName()] = $command->getName();
                 }
@@ -143,12 +143,59 @@ try {
     switch ($action) {
         case "sendCommands":
         {
-            $hasError = false;
+            $errorMessages = [];
 
-            if (!$hasError) {
+            $selectedEquipments = init('selectedEquipments');
+            $commandNameToSend = init('commandName');
+
+            foreach ($selectedEquipments as $selectedEquipment) {
+                /** @var eqLogic|null|false $eqLogic */
+                $eqLogic = eqLogic::byId($selectedEquipment);
+                if (!$eqLogic) {
+                    $errorMessage = sprintf('Équipement "%s" introuvable', $selectedEquipment);
+                    massAction::logger('error', $errorMessage);
+                    $errorMessages[] = $errorMessage;
+                    continue;
+                }
+
+                /** @var cmd[] $cmds */
+                $cmds = $eqLogic->getCmd('action', null, true);
+                $elligibleCommands = array_filter($cmds, static function (cmd $cmd) use ($commandNameToSend) {
+                    return $cmd->getName() === $commandNameToSend;
+                });
+
+                if (empty($elligibleCommands)) {
+                    $errorMessage =
+                        sprintf(
+                            'Commande "%s" introuvable pour l\'équipement "%s"',
+                            $commandNameToSend,
+                            $eqLogic->getName(),
+                        );
+                    massAction::logger('error', $errorMessage);
+                    $errorMessages[] = $errorMessage;
+                    continue;
+                }
+
+                $commandToSend = reset($elligibleCommands);
+                try {
+                    $commandToSend->execCmd();
+                } catch (Throwable $e) {
+                    $errorMessage = sprintf(
+                        'Erreur lors de l\'envoi de la commande "%s" pour l\'équipement "%s" : %s',
+                        $commandNameToSend,
+                        $eqLogic->getName(),
+                        $e->getMessage()
+                    );
+                    massAction::logger('error', $errorMessage);
+                    $errorMessages[] = $errorMessage;
+                    continue;
+                }
+            }
+
+            if (empty($errorMessages)) {
                 ajax::success();
             } else {
-                ajax::error();
+                ajax::error(implode("\n", $errorMessages));
             }
 
             return;
