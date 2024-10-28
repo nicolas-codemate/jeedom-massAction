@@ -127,7 +127,29 @@ $(function () {
             allCommands.forEach(command => {
                 $commandSelector.append(`<option value="${command}">${command}</option>`);
             });
+            bindCommandSelector();
         };
+
+        const bindCommandSelector = function () {
+            const form = $('#ajaxForm');
+            $('select#commandSelector').on('change', function () {
+                toggleCommandForm();
+                // set all equipements command to selected command
+                const selectedCommand = $(this).val();
+                $('select.equipement-command', form).each(function () {
+                    // test if selector have this value
+                    if ($(this).find(`option[value="${selectedCommand}"]`).length === 0) {
+                        return;
+                    }
+
+                    $(this).val(selectedCommand);
+                });
+            });
+
+            $('select.equipement-command', form).on('change', function () {
+                toggleCommandForm();
+            });
+        }
 
         // build line for each equipements in plugin index
         const buildObject = function (jeeObject) {
