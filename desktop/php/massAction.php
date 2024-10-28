@@ -71,6 +71,9 @@ sendVarToJS('objects', $objects);
                     </select>
                 </div>
             </div>
+            <div class="col-md-3" style="padding-top:30px;">
+                <button class="btn btn-lg btn-success" id="refreshEquipments">
+                    <i class="fas fa-sync"></i> {{Rafraîchir}}
         </div>
     </div>
     <div class="eqLogicThumbnailContainer" id="eqLogicThumbnailContainer">

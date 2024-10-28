@@ -133,7 +133,6 @@ $(function () {
         const bindCommandSelector = function () {
             const form = $('#ajaxForm');
             $('select#commandSelector').on('change', function () {
-                toggleCommandForm();
                 // set all equipements command to selected command
                 const selectedCommand = $(this).val();
                 $('select.equipement-command', form).each(function () {
@@ -144,6 +143,7 @@ $(function () {
 
                     $(this).val(selectedCommand);
                 });
+                toggleCommandForm();
             });
 
             $('select.equipement-command', form).on('change', function () {
@@ -157,8 +157,6 @@ $(function () {
             const state = jeeObject?.values["etat"]?.value || '{{Inconnu}}';
 
             // TODO add timestamp of latest value as a tooltip
-            // TODO implement "Action" button.
-            // TODO best scenario, I would like to add every object even if there is no equipements to add the ability to click action button and open modal with all child equipements already selected
             // TODO create a timeout function that could refresh latest values
             return `
 <div class="eqLogicDisplayCard cursor displayAsTable" data-object="${jeeObject.id}">
@@ -234,20 +232,31 @@ $(function () {
             container.append(equipments);
         };
 
-        const brokerSelector = $('select#brokerSelector');
-        const objectParent = $('select#parentObjectSelector');
+        const loadEquipmentsList = async function () {
+            const brokerSelector = $('select#brokerSelector');
+            const objectParent = $('select#parentObjectSelector');
+
+            if (brokerSelector.val() === '' || objectParent.val() === '') {
+                return;
+            }
+
+            const data = await searchEquipments(brokerSelector.val(), objectParent.val());
+            if (data) {
+                buildEqLogicContainer(data);
+            }
+        }
 
         const initPage = function () {
+
+            const brokerSelector = $('select#brokerSelector');
+            const objectParent = $('select#parentObjectSelector');
+
+            $('#refreshEquipments').on('click', async function () {
+                await loadEquipmentsList();
+            });
+
             brokerSelector.on('change', async function () {
-                if (objectParent.value() === '' || $(this).val() === '') {
-                    // reset container
-                    buildEqLogicContainer();
-                    return;
-                }
-                const data = await searchEquipments($(this).val(), objectParent.val());
-                if (data) {
-                    buildEqLogicContainer(data);
-                }
+                await loadEquipmentsList();
             });
 
             objectParent.on('change', async function () {
@@ -377,7 +386,6 @@ $(function () {
 
                         const formData = new FormData(document.forms['ajaxForm']);
                         formData.append('action', 'sendCommands');
-                        debugger;
                         $.ajax({
                             url: 'plugins/massAction/core/ajax/massAction.ajax.php',
                             type: 'POST',
@@ -395,6 +403,7 @@ $(function () {
 
                                     return;
                                 }
+                                loadEquipmentsList();
                                 $.fn.showAlert({message: 'Commandes envoyées', level: 'success'});
                             },
                             cache: false,
