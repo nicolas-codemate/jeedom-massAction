@@ -84,43 +84,58 @@ function buildEquipments(jeeObject $parentObject, array $jMQTTs): array
 {
     $equipments = [];
     foreach ($jMQTTs as $jMQTT) {
-        if ($jMQTT->getObject_id() === $parentObject->getId()) {
-            $equipmentToAdd = [
-                'id' => $jMQTT->getId(),
-                'name' => $jMQTT->getName(),
-                'humanName' => $jMQTT->getHumanName(true, true),
-                'icon' => $jMQTT->getConfiguration('icone'),
-                'values' => [],
-                'commands' => [],
-            ];
+        if ($jMQTT->getObject_id() !== $parentObject->getId()) {
+            continue;
+        }
 
-            /** @var cmd[] $commands */
-            $commands = $jMQTT->getCmd(null, null, true);
-            foreach ($commands as $command) {
-                if ($command->getType() === 'info') {
-                    /** @var history[] $history */
-                    $history = $command->getHistory();
-                    $latestHistory = end($history);
-                    if (false === $latestHistory) {
-                        continue;
-                    }
-                    $equipmentToAdd['values'][$command->getName()] = [
-                        'value' => $latestHistory->getValue(),
-                        'timestamp' => $latestHistory->getDatetime(),
-                    ];
-                }
+        $jMQTTObject = $jMQTT->getObject();
+        $fullHumanName = [$jMQTTObject->getName()];
+        while ($father = $jMQTTObject->getFather()) {
+            $fullHumanName[] = $father->getName();
+            $jMQTTObject = $father;
+        }
 
-                if ($command->getType() === 'action') {
-                    // use key to ensure unicity in command name
-                    $equipmentToAdd['commands'][$command->getName()] = $command->getName();
+        $fullHumanName = array_reverse($fullHumanName);
+        $fullHumanName[] = $jMQTT->getName();
+
+        $fullHumanName = implode(' - ', $fullHumanName);
+
+        $equipmentToAdd = [
+            'id' => $jMQTT->getId(),
+            'name' => $jMQTT->getName(),
+            'humanName' => $jMQTT->getHumanName(true, true),
+            'fullHumanName' => $fullHumanName,
+            'icon' => $jMQTT->getConfiguration('icone'),
+            'values' => [],
+            'commands' => [],
+        ];
+
+        /** @var cmd[] $commands */
+        $commands = $jMQTT->getCmd(null, null, true);
+        foreach ($commands as $command) {
+            if ($command->getType() === 'info') {
+                /** @var history[] $history */
+                $history = $command->getHistory();
+                $latestHistory = end($history);
+                if (false === $latestHistory) {
+                    continue;
                 }
+                $equipmentToAdd['values'][$command->getName()] = [
+                    'value' => $latestHistory->getValue(),
+                    'timestamp' => $latestHistory->getDatetime(),
+                ];
             }
 
-            // drop the key
-            $equipmentToAdd['commands'] = array_values($equipmentToAdd['commands']);
-
-            $equipments[] = $equipmentToAdd;
+            if ($command->getType() === 'action') {
+                // use key to ensure unicity in command name
+                $equipmentToAdd['commands'][$command->getName()] = $command->getName();
+            }
         }
+
+        // drop the key
+        $equipmentToAdd['commands'] = array_values($equipmentToAdd['commands']);
+
+        $equipments[] = $equipmentToAdd;
     }
 
 //    $equipments['total'] = count($equipments);

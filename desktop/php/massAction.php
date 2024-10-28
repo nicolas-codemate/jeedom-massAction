@@ -45,24 +45,40 @@ sendVarToJS('objects', $objects);
                 </div>
             </div>
         </div>
-        <div class="input-group" style="margin:5px;">
-            <label for="brokerSelector">{{Choix du broker}}</label>
-            <select id="brokerSelector" class="form-control" style="width: 100%;">
-                <option value="">{{Tous les brokers}}</option>
-                <?php
-                foreach ($eqBrokers as $eqB) {
-                    echo '<option value="'.$eqB->getId().'">'.$eqB->getName().'</option>';
-                }
-                ?>
-            </select>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="input-group" style="margin:5px;">
+                    <label for="parentObjectSelector">{{Objet parent}}</label>
+                    <select id="parentObjectSelector" class="form-control" style="width: 100%;">
+                        <?php
+                        foreach ($objects as $objectId => $object) {
+                            echo '<option value="'.$objectId.'">'.str_repeat('&nbsp;', $object['parentNumber']).$object['name'].'</option>';
+                        }
+                        ?>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group" style="margin:5px;">
+                    <label for="brokerSelector">{{Choix du broker}}</label>
+                    <select id="brokerSelector" class="form-control" style="width: 100%;">
+                        <option value="">{{Tous les brokers}}</option>
+                        <?php
+                        foreach ($eqBrokers as $eqB) {
+                            echo '<option value="'.$eqB->getId().'">'.$eqB->getName().'</option>';
+                        }
+                        ?>
+                    </select>
+                </div>
+            </div>
         </div>
-        <div class="eqLogicThumbnailContainer" id="eqLogicThumbnailContainer">
-            <legend>
-                <i class="fas fa-table"></i> {{Mes Equipements sur le broker}}
-            </legend>
-        </div>
-    </div> <!-- /.eqLogicThumbnailDisplay -->
-</div>
+    </div>
+    <div class="eqLogicThumbnailContainer" id="eqLogicThumbnailContainer">
+        <legend>
+            <i class="fas fa-table"></i> {{Mes Equipements sur le broker}}
+        </legend>
+    </div>
+</div> <!-- /.eqLogicThumbnailDisplay -->
 
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php

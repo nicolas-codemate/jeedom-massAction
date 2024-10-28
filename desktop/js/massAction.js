@@ -44,9 +44,11 @@ $(function () {
         }
 
         const buildEquipementsSelect = async function () {
+            const $equimentsContainer = $('#equimentsContainer');
+            $equimentsContainer.empty();
             resetEquipementSelect();
             const brokerId = $('#jmqttBrkSelector').val();
-            const parentObjectSelectorId = $('#parentObjectSelector').val();
+            const parentObjectSelectorId = $('#modalParentObjectSelector').val();
 
             if (brokerId === '' || parentObjectSelectorId === '') {
                 return;
@@ -70,9 +72,35 @@ $(function () {
             const equipmentsData = await searchEquipments(brokerId, parentObjectSelectorId);
             const equipments = filterEquipments(equipmentsData.result);
 
+            const buildEquipementForm = function (equipment) {
+
+                const state = equipment?.values["etat"]?.value || '{{Inconnu}}';
+
+                return `
+<div class="form-group">
+    <label for="equipement_${equipment.id}" class="control-label col-lg-7">
+        <img class="lazy" src="plugins/jMQTT/core/img/node_${equipment.icon}.svg" style="min-height: 24px; height:24px; width:auto;padding-top:1px;">
+        <span>${equipment.fullHumanName}</span>
+    </label>
+    <span class="col-lg-1 label label-${state === 'Inconnu' ? 'danger' : 'primary'}">
+        ${state}
+    </span>
+    <select id="equipement_${equipment.id}" class="form-control col-lg-2 pull-right" name="equipement_${equipment.id}" style="margin-right:10px;">
+        <option value="">{{Aucune}}</option>
+        ${equipment.commands.map(command => `<option value="${command}">${command}</option>`).join('')}
+    </select>
+    <div class="col-lg-2">
+        &nbsp;
+    </div>
+</div>
+</div>
+`;
+            }
+
             $.each(equipments, function (key, obj) {
                 const $selectedEquipments = $('#selectedEquipments');
                 $selectedEquipments.append(`<option value="${obj.id}">${obj.name}</option>`);
+                $equimentsContainer.append(buildEquipementForm(obj));
             });
 
             rebuildEquipementSelect();
@@ -109,7 +137,6 @@ $(function () {
         <span class="label label-${state === 'Inconnu' ? 'danger' : 'primary'}">
         ${state}
         </span>
-        &nbsp;<span class="label label-success">Action</span>
     </span>
 </div>
 `;
@@ -146,14 +173,23 @@ $(function () {
             }
         };
 
-        $('select#brokerSelector').on('change', async function () {
-            const data = await searchEquipments($(this).val());
-
+        const buildEqLogicContainer = function (data) {
             const container = $('#eqLogicThumbnailContainer');
             container.find('div').remove();
 
+            if (!data) {
+                return;
+            }
+
             const buildEquipments = function (jeeObject) {
                 let equipments = [];
+
+                // console.log(jeeObject);
+
+                // if(jeeObject.equipments.length === 0 && jeeObject.child.length === 0) {
+                //     return [buildEmptyState()];
+                // }
+
                 if (jeeObject.equipments.length > 0) {
                     equipments = jeeObject.equipments.map(equipment => buildObject(equipment));
                 }
@@ -169,32 +205,66 @@ $(function () {
 
             const equipments = buildEquipments(data.result);
             container.append(equipments);
+        };
+
+        const brokerSelector = $('select#brokerSelector');
+        const objectParent = $('select#parentObjectSelector');
+
+        brokerSelector.on('change', async function () {
+            if (objectParent.value() === '' || $(this).val() === '') {
+                buildEqLogicContainer();
+                return;
+            }
+            const data = await searchEquipments($(this).val(), objectParent.val());
+            if (data) {
+                buildEqLogicContainer(data);
+            }
         });
 
+        objectParent.on('change', async function () {
+            if (brokerSelector.value() === '') {
+                return;
+            }
+            const data = await searchEquipments(brokerSelector.val(), $(this).val());
+            if (data) {
+                buildEqLogicContainer(data);
+            }
+        });
+
+
         $('.eqLogicAction[data-action=massAction]').off('click').on('click', async function () {
+
+            const selectedBroker = brokerSelector.val();
+            const selectedObject = objectParent.val();
+
             let dialog_message = '';
 
             dialog_message += '<form id="ajaxForm">';
             dialog_message += '<div class="row">';
+
+            // Object parent selector
+            dialog_message += '<div class="col-md-6">';
+            dialog_message += '<label class="control-label">{{Objet parent}}</label>';
+            dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalParentObjectSelector">';
+            dialog_message += '<option value="">{{Aucun}}</option>';
+            $.each(objects, function (key, obj) {
+                dialog_message += `<option value="${key}" ${selectedObject === key ? 'selected' : ''}>${'&nbsp;'.repeat(obj.parentNumber)} ${obj.name} </option>`;
+            });
+            dialog_message += '</select><br/>';
+            dialog_message += '</div>'
+
+            // Broker selector
             dialog_message += '<div class="col-md-6">';
 
             dialog_message += '<label class="control-label">{{Broker utilisé :}}</label> ';
             dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="jmqttBrkSelector">';
             dialog_message += '<option value="">{{Aucun}}</option>';
+
             $.each(eqBrokers, function (key, name) {
-                dialog_message += '<option value="' + key + '">' + name + '</option>';
+                dialog_message += '<option value="' + key + '" ' + (selectedBroker === key ? 'selected' : '') + '>' + name + '</option>';
             });
             dialog_message += '</select><br/>';
 
-            dialog_message += '</div>'
-            dialog_message += '<div class="col-md-6">';
-            dialog_message += '<label class="control-label">{{Objet parent}}</label>';
-            dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="parentObjectSelector">';
-            dialog_message += '<option value="">{{Aucun}}</option>';
-            $.each(objects, function (key, obj) {
-                dialog_message += `<option value="${key}">${'&nbsp;'.repeat(obj.parentNumber)} ${obj.name} </option>`;
-            });
-            dialog_message += '</select><br/>';
             dialog_message += '</div>'
 
             dialog_message += '</div>';
@@ -223,6 +293,11 @@ $(function () {
         <br/>
         `;
 
+            dialog_message += `
+        <hr>
+        <div class="row" id="equimentsContainer" style="height:200px; overflow-y:scroll"></div>   
+            `
+
             dialog_message += '</div>';
 
             dialog_message += '</form>';
@@ -230,6 +305,7 @@ $(function () {
             bootbox.confirm({
                 title: "{{Envoyer les commandes}}",
                 message: dialog_message,
+                size: 'large',
                 buttons: {
                     confirm: {
                         label: 'Valider',
@@ -244,8 +320,9 @@ $(function () {
                     $('#selectedEquipments').multiselect({
                         includeSelectAllOption: true,
                     });
+                    await buildEquipementsSelect();
                     toggleCommandForm();
-                    $('#jmqttBrkSelector, #parentObjectSelector').bind('change', async function () {
+                    $('#jmqttBrkSelector, #modalParentObjectSelector').bind('change', async function () {
                         await buildEquipementsSelect();
                         toggleCommandForm();
                     });
