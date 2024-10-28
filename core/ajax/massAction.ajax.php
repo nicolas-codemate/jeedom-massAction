@@ -159,7 +159,7 @@ try {
             // iterate over all equipements_xx key from $_POST and create an array of equipements with associated command name
             $selectedEquipments = [];
             foreach ($_POST as $key => $value) {
-                if(empty($value)) {
+                if (empty($value)) {
                     continue;
                 }
 
@@ -168,7 +168,7 @@ try {
                 }
             }
 
-            foreach ($selectedEquipments as $equipmentId =>  $commandName) {
+            foreach ($selectedEquipments as $equipmentId => $commandName) {
                 /** @var eqLogic|null|false $eqLogic */
                 $eqLogic = eqLogic::byId($equipmentId);
                 if (!$eqLogic) {
@@ -217,6 +217,104 @@ try {
             } else {
                 ajax::error(implode("\n", $errorMessages));
             }
+
+            return;
+        }
+        case "addVirtual":
+        {
+            $plugin = plugin::byId('virtual');
+            if (null === $plugin) {
+                ajax::error('Le plugin virtuel n\'est pas installé');
+            }
+
+            $parentObjectId = init('parentObject');
+
+            $isVisible = init('isVisible');
+            $isVisible = empty($isVisible) ? 0 : 1;
+
+            $isEnable = init('isEnable');
+            $isEnable = empty($isEnable) ? 0 : 1;
+
+            db::beginTransaction();
+
+            /** @var jeeObject|null $parentObject */
+            $parentObject = jeeObject::byId($parentObjectId);
+            if (null === $parentObject) {
+                $errorMessage = sprintf('Objet parent "%s" introuvable', $parentObjectId);
+                massAction::logger('error', $errorMessage);
+                ajax::error($errorMessage);
+            }
+
+            $virtual = new virtual();
+
+            $virtualConfiguration = [
+                'name' => init('virtualName'),
+                'eqType_name' => 'virtual',
+                'object_id' => $parentObject->getId(),
+                'isVisible' => $isVisible,
+                'isEnable' => $isEnable,
+                'type' => 'virtual',
+            ];
+            utils::a2o($virtual, $virtualConfiguration);
+
+            $virtual->save();
+
+            // iterate over all equipements_xx key from $_POST and create an array of equipements with associated command name
+            $selectedEquipments = [];
+
+            foreach ($_POST as $key => $value) {
+                if (empty($value) || $value !== 'on') {
+                    continue;
+                }
+
+                if (preg_match('/^equipement_(\d+)$/', $key, $matches)) {
+                    $selectedEquipments[] = $matches[1];
+                }
+            }
+
+            // store all the virtual commands indexed by the command name
+            $virtualCommands = [];
+
+            foreach ($selectedEquipments as $equipment) {
+                /** @var eqLogic|null|false $eqLogic */
+                $eqLogic = eqLogic::byId($equipment);
+                if (!$eqLogic) {
+                    $errorMessage = sprintf('Équipement "%s" introuvable', $equipment);
+                    massAction::logger('error', $errorMessage);
+                    $errorMessages[] = $errorMessage;
+                    continue;
+                }
+
+                $cmds = $eqLogic->getCmd('action', null, true);
+
+                foreach ($cmds as $cmd) {
+                    if (false === array_key_exists($cmd->getName(), $virtualCommands)) {
+                        $virtualCommands[$cmd->getName()] = [];
+                    }
+                    $virtualCommands[$cmd->getName()][] = '#'.$cmd->getId().'#';
+                }
+            }
+
+            foreach ($virtualCommands as $commandName => $commandHumanNames) {
+                $combinedInfoName = implode(' && ', $commandHumanNames);
+
+                $virtualCmd = new virtualCmd();
+                $virtualCmd
+                    ->setName($commandName)
+                    ->setType('action')
+                    ->setSubType('other')
+                    ->setIsVisible(1)
+                    ->setConfiguration('virtualAction', 1)
+                    ->setConfiguration('infoName', $combinedInfoName)
+                    ->setEqLogic_id($virtual->getId());
+
+                $virtualCmd->save();
+
+            }
+
+            db::commit();
+
+            ajax::success();
 
             return;
         }

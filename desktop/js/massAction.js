@@ -15,21 +15,164 @@
 */
 
 $(function () {
+
+        const initModal = function (size, title, message, ajaxAction) {
+            bootbox.confirm({
+                title,
+                message,
+                size,
+                buttons: {
+                    confirm: {
+                        label: 'Valider',
+                        className: 'btn-success'
+                    },
+                    cancel: {
+                        label: 'Annuler',
+                        className: 'btn-danger'
+                    }
+                },
+                onShown: async function () {
+                    // initialize form on modal shown
+                    await buildEquipementsSelect();
+                    toggleCommandForm();
+
+                    // bind change event on selects
+                    $('#modalBrokerSelector, #modalParentObjectSelector').bind('change', async function () {
+                        await buildEquipementsSelect();
+                        toggleCommandForm();
+                    });
+
+                    $('#virtualName').bind('input', function () {
+                        toggleCommandForm();
+                    });
+                },
+                callback: function (result) {
+                    if (!result) {
+                        return;
+                    }
+
+                    const $acceptButton = $('.bootbox-accept');
+                    const $cancelButton = $('.bootbox-cancel');
+                    [$acceptButton, $cancelButton].forEach(button => {
+                        button.attr('disabled', 'disabled');
+                        button.addClass('disabled');
+                    });
+                    $acceptButton.html('Envoi en cours...');
+
+                    const formData = new FormData(document.forms['ajaxForm']);
+                    formData.append('action', ajaxAction);
+                    $.ajax({
+                        url: 'plugins/massAction/core/ajax/massAction.ajax.php',
+                        type: 'POST',
+                        data: formData,
+                        async: false,
+                        success: function (data) {
+                            const returnData = JSON.parse(data);
+                            if (returnData.state !== 'ok') {
+                                $.fn.showAlert({message: returnData.result, level: 'error'});
+                                [$acceptButton, $cancelButton].forEach(button => {
+                                    button.removeAttr('disabled');
+                                    button.removeClass('disabled');
+                                });
+                                $acceptButton.html('Valider');
+
+                                return;
+                            }
+                            loadEquipmentsList();
+                            $.fn.showAlert({message: 'Succès', level: 'success'});
+                        },
+                        cache: false,
+                        contentType: false,
+                        processData: false,
+                    });
+                }
+            });
+        };
+
+        const buildBaseModal = function (brokerSelector, objectParent) {
+            const selectedBroker = brokerSelector.val();
+            const selectedObject = objectParent.val();
+
+            let dialog_message = '';
+
+            dialog_message += '<div class="row">';
+
+            // Object parent selector
+            dialog_message += '<div class="col-md-6">';
+            dialog_message += '<label class="control-label">{{Objet parent}}</label>';
+            dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalParentObjectSelector" name="parentObject">';
+            dialog_message += '<option value="">{{Aucun}}</option>';
+            $.each(objects, function (key, obj) {
+                dialog_message += `<option value="${key}" ${selectedObject === key ? 'selected' : ''}>${'&nbsp;'.repeat(obj.parentNumber)} ${obj.name} </option>`;
+            });
+            dialog_message += '</select><br/>';
+            dialog_message += '</div>'
+
+            // Broker selector
+            dialog_message += '<div class="col-md-6">';
+
+            dialog_message += '<label class="control-label">{{Broker utilisé :}}</label> ';
+            dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalBrokerSelector" name="broker">';
+            dialog_message += '<option value="">{{Aucun}}</option>';
+
+            $.each(eqBrokers, function (key, name) {
+                dialog_message += '<option value="' + key + '" ' + (selectedBroker === key ? 'selected' : '') + '>' + name + '</option>';
+            });
+            dialog_message += '</select><br/>';
+
+            dialog_message += '</div>'
+
+            dialog_message += '</div>';
+
+            dialog_message += `
+    <div class="row">
+        <div class="col-md-12">
+            <h2 id="equipmentFound" class="hidden">{{Equipements trouvés}} <span id="countEquipements"></span></h2>
+            <h2 id="noEquipmentFound" class="hidden">{{Aucun équipement trouvé}}</h2>
+        </div>
+    </div>
+    <br/>
+    `;
+
+            return dialog_message;
+        }
+
         // manage CTA button for modal (enable or disable)
         const toggleCommandForm = function () {
             const $selectedEquipmentsCommand = $('select.equipement-command');
 
+            const $acceptButton = $('.bootbox-accept');
+
+            const disableAcceptButton = function () {
+                $acceptButton.attr('disabled', 'disabled');
+                $acceptButton.addClass('disabled');
+            }
+
+            const enableAcceptButton = function () {
+                $acceptButton.removeAttr('disabled');
+                $acceptButton.removeClass('disabled');
+            }
+
+            if (!$selectedEquipmentsCommand.length) {
+                const hasVirtualName = $('#virtualName').val();
+                if (hasVirtualName) {
+                    enableAcceptButton();
+                    return;
+                }
+
+                disableAcceptButton();
+                return;
+            }
+
             // check if at least one command is selected
             const hasSelectedCommand = Array.from($selectedEquipmentsCommand).some(select => select.value !== '');
 
-            const $acceptButton = $('.bootbox-accept');
             if (hasSelectedCommand) {
-                $acceptButton.removeAttr('disabled');
-                $acceptButton.removeClass('disabled');
+                enableAcceptButton();
                 return;
             }
-            $acceptButton.attr('disabled', 'disabled');
-            $acceptButton.addClass('disabled');
+
+            disableAcceptButton();
         };
 
         // build equipements command selectors in modal
@@ -105,12 +248,36 @@ $(function () {
         &nbsp;
     </div>
 </div>
+`;
+            }
+
+            const buildEquipementsCheckbox = function (equipment) {
+                return `
+<div class="form-group">
+    <label for="equipement_${equipment.id}" class="control-label col-lg-8">
+        <img class="lazy" src="plugins/jMQTT/core/img/node_${equipment.icon}.svg" style="min-height: 24px; height:24px; width:auto;padding-top:1px;">
+        <span>${equipment.fullHumanName}</span>
+    </label>
+    <div class="col-lg-1">
+        <input type="checkbox" id="equipement_${equipment.id}" class="form-control pull-right" name="equipement_${equipment.id}" style="margin-right:10px;" checked>
+    </div>
+    <div class="col-lg-3">
+        &nbsp;
+    </div>
 </div>
 `;
             }
 
+            const $commandSelector = $('#commandSelector');
+
             $.each(equipments, function (key, obj) {
-                $equimentsContainer.append(buildEquipementForm(obj));
+                if ($commandSelector.length) {
+                    // for now, we manage 2 modals. Either we send command to all selected equipements
+                    $equimentsContainer.append(buildEquipementForm(obj));
+                } else {
+                    // either we create a virtual object with all equipements
+                    $equimentsContainer.append(buildEquipementsCheckbox(obj));
+                }
             });
 
             const commands = equipments.reduce((acc, equipment) => {
@@ -121,7 +288,9 @@ $(function () {
             // order set alphabetically
             const allCommands = Array.from(commands).sort();
 
-            const $commandSelector = $('#commandSelector');
+            if (!$commandSelector.length) {
+                return;
+            }
             $commandSelector.empty();
             $commandSelector.append('<option value="">{{Aucune}}</option>');
             allCommands.forEach(command => {
@@ -247,13 +416,12 @@ $(function () {
         }
 
         const initPage = function () {
-
-            const brokerSelector = $('select#brokerSelector');
-            const objectParent = $('select#parentObjectSelector');
-
             $('#refreshEquipments').on('click', async function () {
                 await loadEquipmentsList();
             });
+
+            const brokerSelector = $('select#brokerSelector');
+            const objectParent = $('select#parentObjectSelector');
 
             brokerSelector.on('change', async function () {
                 await loadEquipmentsList();
@@ -271,147 +439,62 @@ $(function () {
 
             $('.eqLogicAction[data-action=massAction]').off('click').on('click', async function () {
 
-                const selectedBroker = brokerSelector.val();
-                const selectedObject = objectParent.val();
-
-                let dialog_message = '';
-
-                // dialog_message += '<form id="ajaxForm">';
-                dialog_message += '<div class="row">';
-
-                // Object parent selector
-                dialog_message += '<div class="col-md-6">';
-                dialog_message += '<label class="control-label">{{Objet parent}}</label>';
-                dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalParentObjectSelector">';
-                dialog_message += '<option value="">{{Aucun}}</option>';
-                $.each(objects, function (key, obj) {
-                    dialog_message += `<option value="${key}" ${selectedObject === key ? 'selected' : ''}>${'&nbsp;'.repeat(obj.parentNumber)} ${obj.name} </option>`;
-                });
-                dialog_message += '</select><br/>';
-                dialog_message += '</div>'
-
-                // Broker selector
-                dialog_message += '<div class="col-md-6">';
-
-                dialog_message += '<label class="control-label">{{Broker utilisé :}}</label> ';
-                dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalBrokerSelector">';
-                dialog_message += '<option value="">{{Aucun}}</option>';
-
-                $.each(eqBrokers, function (key, name) {
-                    dialog_message += '<option value="' + key + '" ' + (selectedBroker === key ? 'selected' : '') + '>' + name + '</option>';
-                });
-                dialog_message += '</select><br/>';
-
-                dialog_message += '</div>'
-
-                dialog_message += '</div>';
+                let dialog_message = buildBaseModal(brokerSelector, objectParent);
 
                 dialog_message += `
+<div id="actionForm" style="display: none;">
     <div class="row">
-        <div class="col-md-12">
-            <h2 id="equipmentFound" class="hidden">{{Equipements trouvés}} <span id="countEquipements"></span></h2>
-            <h2 id="noEquipmentFound" class="hidden">{{Aucun équipement trouvé}}</h2>
+        <div class="form-group col-md-12">
+            <label for="commandSelector" class="control-label">Commandes</label>
+            <select class="bootbox-input bootbox-input-select form-control" id="commandSelector" name="commandName">
+                <option value="">{{Aucune}}</option>
+            </select>
+        </div>
+        <div class="col-md-12" style="margin-top:10px;">
+            <p class="bg-primary">
+            Utiliser ce sélecteur pour envoyer la commande à tous les équipements sélectionnés.
+            Vous pouvez cependant personnaliser les commandes pour chaque équipement.
+            </p>
         </div>
     </div>
     <br/>
-    `;
-
-                dialog_message += '<div id="actionForm" style="display: none;">';
-
-                dialog_message += `
-        <div class="row">
-            <div class="form-group col-md-12">
-                <label for="commandSelector" class="control-label">Commandes</label>
-                <select class="bootbox-input bootbox-input-select form-control" id="commandSelector" name="commandName">
-                    <option value="">{{Aucune}}</option>
-                </select>
-            </div>
-            <div class="col-md-12" style="margin-top:10px;">
-                <p class="bg-primary">
-                Utiliser ce sélecteur pour envoyer la commande à tous les équipements sélectionnés.
-                Vous pouvez cependant personnaliser les commandes pour chaque équipement.
-                </p>
-            </div>
-        </div>
-        <br/>
+    <hr>
+    <form id="ajaxForm">
+        <div class="row" id="equimentsContainer" style="height:300px; overflow-y:scroll"></div>
+    </form>
+</div>   
         `;
+                initModal('large', "Envoyer les commandes", dialog_message, 'sendCommands');
+            });
 
+            $('.eqLogicAction[data-action=addVirtual]').off('click').on('click', function () {
+                let dialog_message = `<form id="ajaxForm">`;
+                dialog_message += buildBaseModal(brokerSelector, objectParent);
                 dialog_message += `
-        <hr>
-        <form id="ajaxForm">
-        <div class="row" id="equimentsContainer" style="height:300px; overflow-y:scroll"></div>   
-            `
-
-                dialog_message += '</form></div>';
-
-                // dialog_message += '</form>';
-
-                bootbox.confirm({
-                    title: "{{Envoyer les commandes}}",
-                    message: dialog_message,
-                    size: 'large',
-                    buttons: {
-                        confirm: {
-                            label: 'Valider',
-                            className: 'btn-success'
-                        },
-                        cancel: {
-                            label: 'Annuler',
-                            className: 'btn-danger'
-                        }
-                    },
-                    onShown: async function () {
-                        // initialize form on modal shown
-                        await buildEquipementsSelect();
-                        toggleCommandForm();
-
-                        // bind change event on selects
-                        $('#modalBrokerSelector, #modalParentObjectSelector').bind('change', async function () {
-                            await buildEquipementsSelect();
-                            toggleCommandForm();
-                        });
-                    },
-                    callback: function (result) {
-                        if (!result) {
-                            return;
-                        }
-
-                        const $acceptButton = $('.bootbox-accept');
-                        const $cancelButton = $('.bootbox-cancel');
-                        [$acceptButton, $cancelButton].forEach(button => {
-                            button.attr('disabled', 'disabled');
-                            button.addClass('disabled');
-                        });
-                        $acceptButton.html('Envoi en cours...');
-
-                        const formData = new FormData(document.forms['ajaxForm']);
-                        formData.append('action', 'sendCommands');
-                        $.ajax({
-                            url: 'plugins/massAction/core/ajax/massAction.ajax.php',
-                            type: 'POST',
-                            data: formData,
-                            async: false,
-                            success: function (data) {
-                                const returnData = JSON.parse(data);
-                                if (returnData.state !== 'ok') {
-                                    $.fn.showAlert({message: returnData.result, level: 'error'});
-                                    [$acceptButton, $cancelButton].forEach(button => {
-                                        button.removeAttr('disabled');
-                                        button.removeClass('disabled');
-                                    });
-                                    $acceptButton.html('Valider');
-
-                                    return;
-                                }
-                                loadEquipmentsList();
-                                $.fn.showAlert({message: 'Commandes envoyées', level: 'success'});
-                            },
-                            cache: false,
-                            contentType: false,
-                            processData: false,
-                        });
-                    }
-                });
+<div id="actionForm" style="display: none;">
+    <div class="row">
+        <div class="form-group col-md-12">
+            <label for="virtualName" class="control-label">Nom du virtuel</label>
+            <input id="virtualName" class="bootbox-input bootbox-input-text form-control" type="text" name="virtualName" required>
+        
+        <div class="form-group col-md-12 form-check">
+            <label class="checkbox-inline"><input type="checkbox" name="isEnable" checked>Activer</label>
+            <label class="checkbox-inline"><input type="checkbox" name="isVisible" checked>Visible</label>
+        </div><br/>
+        
+        <div class="col-md-12" style="margin-top:10px;">
+            <p class="bg-primary">
+            Un object virtuel sera crée dans l'objet parent sélectionné, regroupant toute les commandes des équipements sélectionnés.
+            </p>
+        </div>
+        
+        <div class="row" id="equimentsContainer" style="height:300px; overflow-y:scroll"></div>
+    </div>
+    <br/>
+</div>
+</form>
+        `;
+                initModal('large', "Ajouter un virtuel", dialog_message, 'addVirtual');
             });
         }
 

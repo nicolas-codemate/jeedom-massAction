@@ -24,6 +24,13 @@ foreach (jeeObject::buildTree() as $object) {
 
 sendVarToJS('objects', $objects);
 
+$virtualPlugin = null;
+try {
+    $virtualPlugin = plugin::byId('virtual');
+} catch (\Throwable $e) {
+    $virtualPlugin = null;
+}
+
 ?>
 
 <div class="row row-overflow">
@@ -38,6 +45,17 @@ sendVarToJS('objects', $objects);
                     <br>
                     <span>{{Actions}}</span>
                 </div>
+                <?php
+                if ($virtualPlugin) {
+                    ?>
+                    <div class="cursor eqLogicAction logoPrimary" data-action="addVirtual">
+                        <i class="fas fa-plus-circle"></i>
+                        <br>
+                        <span>{{Virtuel}}</span>
+                    </div>
+                    <?php
+                }
+                ?>
                 <div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf">
                     <i class="fas fa-wrench"></i>
                     <br>
@@ -74,21 +92,21 @@ sendVarToJS('objects', $objects);
             <div class="col-md-3" style="padding-top:30px;">
                 <button class="btn btn-lg btn-success" id="refreshEquipments">
                     <i class="fas fa-sync"></i> {{Rafraîchir}}
+            </div>
         </div>
-    </div>
-    <div class="eqLogicThumbnailContainer" id="eqLogicThumbnailContainer">
-        <legend>
-            <i class="fas fa-table"></i> {{Mes Equipements sur le broker}}
-        </legend>
-    </div>
-</div> <!-- /.eqLogicThumbnailDisplay -->
+        <div class="eqLogicThumbnailContainer" id="eqLogicThumbnailContainer">
+            <legend>
+                <i class="fas fa-table"></i> {{Mes Equipements sur le broker}}
+            </legend>
+        </div>
+    </div> <!-- /.eqLogicThumbnailDisplay -->
 
-<!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
-<?php
-include_file('desktop', 'massAction', 'js', 'massAction');
-?>
+    <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
+    <?php
+    include_file('desktop', 'massAction', 'js', 'massAction');
+    ?>
 
-<!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
-<?php
-include_file('core', 'plugin.template', 'js');
-?>
+    <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
+    <?php
+    include_file('core', 'plugin.template', 'js');
+    ?>
