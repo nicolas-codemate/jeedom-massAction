@@ -15,42 +15,41 @@
 */
 
 $(function () {
+        // manage CTA button for modal (enable or disable)
         const toggleCommandForm = function () {
-            const $selectedEquipments = $('#selectedEquipments');
+            const $selectedEquipmentsCommand = $('select.equipement-command');
+
+            // check if at least one command is selected
+            const hasSelectedCommand = Array.from($selectedEquipmentsCommand).some(select => select.value !== '');
+
             const $acceptButton = $('.bootbox-accept');
-            if ($selectedEquipments.value().length > 0) {
-                $('#actionForm').show();
+            if (hasSelectedCommand) {
                 $acceptButton.removeAttr('disabled');
                 $acceptButton.removeClass('disabled');
-            } else {
-                $('#actionForm').hide();
-                $acceptButton.attr('disabled', 'disabled');
-                $acceptButton.addClass('disabled');
+                return;
             }
+            $acceptButton.attr('disabled', 'disabled');
+            $acceptButton.addClass('disabled');
         };
 
-        const resetEquipementSelect = function () {
-            const $selectedEquipments = $('#selectedEquipments');
-            $selectedEquipments.empty();
-            toggleCommandForm();
-            rebuildEquipementSelect();
-        };
-
-        const rebuildEquipementSelect = function () {
-            const $selectedEquipments = $('#selectedEquipments');
-            $selectedEquipments.multiselect('rebuild');
-            $selectedEquipments.multiselect('selectAll', false);
-            $selectedEquipments.multiselect('refresh');
-        }
-
+        // build equipements command selectors in modal
         const buildEquipementsSelect = async function () {
             const $equimentsContainer = $('#equimentsContainer');
-            $equimentsContainer.empty();
-            resetEquipementSelect();
-            const brokerId = $('#jmqttBrkSelector').val();
+            const brokerId = $('#modalBrokerSelector').val();
             const parentObjectSelectorId = $('#modalParentObjectSelector').val();
+            const $countEquipements = $('#countEquipements');
+            const $noEquipmentFound = $('#noEquipmentFound');
+            const $equipmentFound = $('#equipmentFound');
+            const $actionForm = $('#actionForm');
+
+            $equimentsContainer.empty();
+            $actionForm.hide();
 
             if (brokerId === '' || parentObjectSelectorId === '') {
+                $countEquipements.text('');
+                $noEquipmentFound.removeClass('hidden');
+                $equipmentFound.addClass('hidden');
+
                 return;
             }
 
@@ -72,6 +71,19 @@ $(function () {
             const equipmentsData = await searchEquipments(brokerId, parentObjectSelectorId);
             const equipments = filterEquipments(equipmentsData.result);
 
+            if (equipments.length === 0) {
+                $countEquipements.text('');
+                $noEquipmentFound.removeClass('hidden');
+                $equipmentFound.addClass('hidden');
+                return;
+            }
+
+            $countEquipements.text(equipments.length);
+            $noEquipmentFound.addClass('hidden');
+            $equipmentFound.removeClass('hidden');
+
+            $actionForm.show();
+
             const buildEquipementForm = function (equipment) {
 
                 const state = equipment?.values["etat"]?.value || '{{Inconnu}}';
@@ -85,7 +97,7 @@ $(function () {
     <span class="col-lg-1 label label-${state === 'Inconnu' ? 'danger' : 'primary'}">
         ${state}
     </span>
-    <select id="equipement_${equipment.id}" class="form-control col-lg-2 pull-right" name="equipement_${equipment.id}" style="margin-right:10px;">
+    <select id="equipement_${equipment.id}" class="form-control col-lg-2 pull-right equipement-command" name="equipement_${equipment.id}" style="margin-right:10px;">
         <option value="">{{Aucune}}</option>
         ${equipment.commands.map(command => `<option value="${command}">${command}</option>`).join('')}
     </select>
@@ -98,12 +110,8 @@ $(function () {
             }
 
             $.each(equipments, function (key, obj) {
-                const $selectedEquipments = $('#selectedEquipments');
-                $selectedEquipments.append(`<option value="${obj.id}">${obj.name}</option>`);
                 $equimentsContainer.append(buildEquipementForm(obj));
             });
-
-            rebuildEquipementSelect();
 
             const commands = equipments.reduce((acc, equipment) => {
                 equipment.commands.forEach(command => acc.add(command));
@@ -121,6 +129,7 @@ $(function () {
             });
         };
 
+        // build line for each equipements in plugin index
         const buildObject = function (jeeObject) {
 
             const state = jeeObject?.values["etat"]?.value || '{{Inconnu}}';
@@ -142,6 +151,7 @@ $(function () {
 `;
         }
 
+        // send ajax call to get equipments from broker and parent object
         const searchEquipments = async function (brokerId, parentObjectId) {
             if (!brokerId) {
                 return [];
@@ -173,6 +183,7 @@ $(function () {
             }
         };
 
+        // build plugin index page with equipements list and current state
         const buildEqLogicContainer = function (data) {
             const container = $('#eqLogicThumbnailContainer');
             container.find('div').remove();
@@ -183,12 +194,6 @@ $(function () {
 
             const buildEquipments = function (jeeObject) {
                 let equipments = [];
-
-                // console.log(jeeObject);
-
-                // if(jeeObject.equipments.length === 0 && jeeObject.child.length === 0) {
-                //     return [buildEmptyState()];
-                // }
 
                 if (jeeObject.equipments.length > 0) {
                     equipments = jeeObject.equipments.map(equipment => buildObject(equipment));
@@ -210,165 +215,173 @@ $(function () {
         const brokerSelector = $('select#brokerSelector');
         const objectParent = $('select#parentObjectSelector');
 
-        brokerSelector.on('change', async function () {
-            if (objectParent.value() === '' || $(this).val() === '') {
-                buildEqLogicContainer();
-                return;
-            }
-            const data = await searchEquipments($(this).val(), objectParent.val());
-            if (data) {
-                buildEqLogicContainer(data);
-            }
-        });
-
-        objectParent.on('change', async function () {
-            if (brokerSelector.value() === '') {
-                return;
-            }
-            const data = await searchEquipments(brokerSelector.val(), $(this).val());
-            if (data) {
-                buildEqLogicContainer(data);
-            }
-        });
-
-
-        $('.eqLogicAction[data-action=massAction]').off('click').on('click', async function () {
-
-            const selectedBroker = brokerSelector.val();
-            const selectedObject = objectParent.val();
-
-            let dialog_message = '';
-
-            dialog_message += '<form id="ajaxForm">';
-            dialog_message += '<div class="row">';
-
-            // Object parent selector
-            dialog_message += '<div class="col-md-6">';
-            dialog_message += '<label class="control-label">{{Objet parent}}</label>';
-            dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalParentObjectSelector">';
-            dialog_message += '<option value="">{{Aucun}}</option>';
-            $.each(objects, function (key, obj) {
-                dialog_message += `<option value="${key}" ${selectedObject === key ? 'selected' : ''}>${'&nbsp;'.repeat(obj.parentNumber)} ${obj.name} </option>`;
+        const initPage = function () {
+            brokerSelector.on('change', async function () {
+                if (objectParent.value() === '' || $(this).val() === '') {
+                    // reset container
+                    buildEqLogicContainer();
+                    return;
+                }
+                const data = await searchEquipments($(this).val(), objectParent.val());
+                if (data) {
+                    buildEqLogicContainer(data);
+                }
             });
-            dialog_message += '</select><br/>';
-            dialog_message += '</div>'
 
-            // Broker selector
-            dialog_message += '<div class="col-md-6">';
-
-            dialog_message += '<label class="control-label">{{Broker utilisé :}}</label> ';
-            dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="jmqttBrkSelector">';
-            dialog_message += '<option value="">{{Aucun}}</option>';
-
-            $.each(eqBrokers, function (key, name) {
-                dialog_message += '<option value="' + key + '" ' + (selectedBroker === key ? 'selected' : '') + '>' + name + '</option>';
+            objectParent.on('change', async function () {
+                if (brokerSelector.value() === '') {
+                    return;
+                }
+                const data = await searchEquipments(brokerSelector.val(), $(this).val());
+                if (data) {
+                    buildEqLogicContainer(data);
+                }
             });
-            dialog_message += '</select><br/>';
 
-            dialog_message += '</div>'
+            $('.eqLogicAction[data-action=massAction]').off('click').on('click', async function () {
 
-            dialog_message += '</div>';
+                const selectedBroker = brokerSelector.val();
+                const selectedObject = objectParent.val();
 
-            dialog_message += `
+                let dialog_message = '';
+
+                dialog_message += '<form id="ajaxForm">';
+                dialog_message += '<div class="row">';
+
+                // Object parent selector
+                dialog_message += '<div class="col-md-6">';
+                dialog_message += '<label class="control-label">{{Objet parent}}</label>';
+                dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalParentObjectSelector">';
+                dialog_message += '<option value="">{{Aucun}}</option>';
+                $.each(objects, function (key, obj) {
+                    dialog_message += `<option value="${key}" ${selectedObject === key ? 'selected' : ''}>${'&nbsp;'.repeat(obj.parentNumber)} ${obj.name} </option>`;
+                });
+                dialog_message += '</select><br/>';
+                dialog_message += '</div>'
+
+                // Broker selector
+                dialog_message += '<div class="col-md-6">';
+
+                dialog_message += '<label class="control-label">{{Broker utilisé :}}</label> ';
+                dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalBrokerSelector">';
+                dialog_message += '<option value="">{{Aucun}}</option>';
+
+                $.each(eqBrokers, function (key, name) {
+                    dialog_message += '<option value="' + key + '" ' + (selectedBroker === key ? 'selected' : '') + '>' + name + '</option>';
+                });
+                dialog_message += '</select><br/>';
+
+                dialog_message += '</div>'
+
+                dialog_message += '</div>';
+
+                dialog_message += `
     <div class="row">
         <div class="col-md-12">
-            <label class="control-label">{{Equipements}}</label>
-            <select id="selectedEquipments" multiple="multiple" name="selectedEquipments[]"></select>
+            <h2 id="equipmentFound" class="hidden">{{Equipements trouvés}} <span id="countEquipements"></span></h2>
+            <h2 id="noEquipmentFound" class="hidden">{{Aucun équipement trouvé}}</h2>
         </div>
     </div>
     <br/>
     `;
 
-            dialog_message += '<div id="actionForm" style="display: none;">';
+                dialog_message += '<div id="actionForm" style="display: none;">';
 
-            dialog_message += `
+                dialog_message += `
         <div class="row">
             <div class="form-group col-md-12">
-                <label for="commandSelector" class="control-label">{{Commandes}}</label>
+                <label for="commandSelector" class="control-label">Commandes</label>
                 <select class="bootbox-input bootbox-input-select form-control" id="commandSelector" name="commandName">
                     <option value="">{{Aucune}}</option>
                 </select>
+            </div>
+            <div class="col-md-12" style="margin-top:10px;">
+                <p class="bg-primary">
+                Utiliser ce sélecteur pour envoyer la commande à tous les équipements sélectionnés.
+                Vous pouvez cependant personnaliser les commandes pour chaque équipement.
+                </p>
             </div>
         </div>
         <br/>
         `;
 
-            dialog_message += `
+                dialog_message += `
         <hr>
-        <div class="row" id="equimentsContainer" style="height:200px; overflow-y:scroll"></div>   
+        <div class="row" id="equimentsContainer" style="height:300px; overflow-y:scroll"></div>   
             `
 
-            dialog_message += '</div>';
+                dialog_message += '</div>';
 
-            dialog_message += '</form>';
+                dialog_message += '</form>';
 
-            bootbox.confirm({
-                title: "{{Envoyer les commandes}}",
-                message: dialog_message,
-                size: 'large',
-                buttons: {
-                    confirm: {
-                        label: 'Valider',
-                        className: 'btn-success'
+                bootbox.confirm({
+                    title: "{{Envoyer les commandes}}",
+                    message: dialog_message,
+                    size: 'large',
+                    buttons: {
+                        confirm: {
+                            label: 'Valider',
+                            className: 'btn-success'
+                        },
+                        cancel: {
+                            label: 'Annuler',
+                            className: 'btn-danger'
+                        }
                     },
-                    cancel: {
-                        label: 'Annuler',
-                        className: 'btn-danger'
-                    }
-                },
-                onShown: async function () {
-                    $('#selectedEquipments').multiselect({
-                        includeSelectAllOption: true,
-                    });
-                    await buildEquipementsSelect();
-                    toggleCommandForm();
-                    $('#jmqttBrkSelector, #modalParentObjectSelector').bind('change', async function () {
+                    onShown: async function () {
+                        // initialize form on modal shown
                         await buildEquipementsSelect();
                         toggleCommandForm();
-                    });
-                },
-                callback: function (result) {
-                    if (!result) {
-                        return;
+
+                        // bind change event on selects
+                        $('#modalBrokerSelector, #modalParentObjectSelector').bind('change', async function () {
+                            await buildEquipementsSelect();
+                            toggleCommandForm();
+                        });
+                    },
+                    callback: function (result) {
+                        if (!result) {
+                            return;
+                        }
+
+                        const $acceptButton = $('.bootbox-accept');
+                        const $cancelButton = $('.bootbox-cancel');
+                        [$acceptButton, $cancelButton].forEach(button => {
+                            button.attr('disabled', 'disabled');
+                            button.addClass('disabled');
+                        });
+                        $acceptButton.html('Envoi en cours...');
+
+                        const formData = new FormData(document.forms['ajaxForm']);
+                        formData.append('action', 'sendCommands');
+                        $.ajax({
+                            url: 'plugins/massAction/core/ajax/massAction.ajax.php',
+                            type: 'POST',
+                            data: formData,
+                            async: false,
+                            success: function (data) {
+                                const returnData = JSON.parse(data);
+                                if (returnData.state !== 'ok') {
+                                    $.fn.showAlert({message: returnData.result, level: 'error'});
+                                    [$acceptButton, $cancelButton].forEach(button => {
+                                        button.removeAttr('disabled');
+                                        button.removeClass('disabled');
+                                    });
+                                    $acceptButton.html('Valider');
+
+                                    return;
+                                }
+                                $.fn.showAlert({message: 'Commandes envoyées', level: 'success'});
+                            },
+                            cache: false,
+                            contentType: false,
+                            processData: false,
+                        });
                     }
-
-                    const $acceptButton = $('.bootbox-accept');
-                    const $cancelButton = $('.bootbox-cancel');
-                    [$acceptButton, $cancelButton].forEach(button => {
-                        button.attr('disabled', 'disabled');
-                        button.addClass('disabled');
-                    });
-                    $acceptButton.html('Envoi en cours...');
-
-                    const formData = new FormData(document.forms['ajaxForm']);
-                    formData.append('action', 'sendCommands');
-                    $.ajax({
-                        url: 'plugins/massAction/core/ajax/massAction.ajax.php',
-                        type: 'POST',
-                        data: formData,
-                        async: false,
-                        success: function (data) {
-                            const returnData = JSON.parse(data);
-                            if (returnData.state !== 'ok') {
-                                $.fn.showAlert({message: returnData.result, level: 'error'});
-                                [$acceptButton, $cancelButton].forEach(button => {
-                                    button.removeAttr('disabled');
-                                    button.removeClass('disabled');
-                                });
-                                $acceptButton.html('Valider');
-
-                                return;
-                            }
-                            $.fn.showAlert({message: 'Commandes envoyées', level: 'success'});
-                        },
-                        cache: false,
-                        contentType: false,
-                        processData: false,
-                    });
-                }
+                });
             });
-        });
-    }
-)
-;
+        }
 
+        initPage();
+    }
+);

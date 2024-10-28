@@ -83,8 +83,6 @@ sendVarToJS('objects', $objects);
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php
 include_file('desktop', 'massAction', 'js', 'massAction');
-include_file('desktop', 'bootstrap-multiselect', 'js', 'massAction');
-include_file('desktop', 'bootstrap-multiselect', 'css', 'massAction');
 ?>
 
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
