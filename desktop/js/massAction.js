@@ -267,7 +267,7 @@ $(function () {
 
                 let dialog_message = '';
 
-                dialog_message += '<form id="ajaxForm">';
+                // dialog_message += '<form id="ajaxForm">';
                 dialog_message += '<div class="row">';
 
                 // Object parent selector
@@ -329,12 +329,13 @@ $(function () {
 
                 dialog_message += `
         <hr>
+        <form id="ajaxForm">
         <div class="row" id="equimentsContainer" style="height:300px; overflow-y:scroll"></div>   
             `
 
-                dialog_message += '</div>';
+                dialog_message += '</form></div>';
 
-                dialog_message += '</form>';
+                // dialog_message += '</form>';
 
                 bootbox.confirm({
                     title: "{{Envoyer les commandes}}",
@@ -376,6 +377,7 @@ $(function () {
 
                         const formData = new FormData(document.forms['ajaxForm']);
                         formData.append('action', 'sendCommands');
+                        debugger;
                         $.ajax({
                             url: 'plugins/massAction/core/ajax/massAction.ajax.php',
                             type: 'POST',

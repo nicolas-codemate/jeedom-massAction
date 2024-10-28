@@ -58,8 +58,6 @@ function buildTree(jeeObject $parentObject, array $jMQTTs): array
 
     $toReturn = [
         'id' => $parentObject->getId(),
-        // TODO maybe add all the parent object name to create some kind of hierarchy
-//                    'name' => str_repeat('&nbsp;&nbsp;', $object->getConfiguration('parentNumber')).$object->getName(),
         'name' => $parentObject->getName(),
         'equipments' => $equipments,
         'child' => [],
@@ -138,8 +136,6 @@ function buildEquipments(jeeObject $parentObject, array $jMQTTs): array
         $equipments[] = $equipmentToAdd;
     }
 
-//    $equipments['total'] = count($equipments);
-
     return $equipments;
 }
 
@@ -160,14 +156,23 @@ try {
         {
             $errorMessages = [];
 
-            $selectedEquipments = init('selectedEquipments');
-            $commandNameToSend = init('commandName');
+            // iterate over all equipements_xx key from $_POST and create an array of equipements with associated command name
+            $selectedEquipments = [];
+            foreach ($_POST as $key => $value) {
+                if(empty($value)) {
+                    continue;
+                }
 
-            foreach ($selectedEquipments as $selectedEquipment) {
+                if (preg_match('/^equipement_(\d+)$/', $key, $matches)) {
+                    $selectedEquipments[$matches[1]] = $value;
+                }
+            }
+
+            foreach ($selectedEquipments as $equipmentId =>  $commandName) {
                 /** @var eqLogic|null|false $eqLogic */
-                $eqLogic = eqLogic::byId($selectedEquipment);
+                $eqLogic = eqLogic::byId($equipmentId);
                 if (!$eqLogic) {
-                    $errorMessage = sprintf('Équipement "%s" introuvable', $selectedEquipment);
+                    $errorMessage = sprintf('Équipement "%s" introuvable', $equipmentId);
                     massAction::logger('error', $errorMessage);
                     $errorMessages[] = $errorMessage;
                     continue;
@@ -175,15 +180,15 @@ try {
 
                 /** @var cmd[] $cmds */
                 $cmds = $eqLogic->getCmd('action', null, true);
-                $elligibleCommands = array_filter($cmds, static function (cmd $cmd) use ($commandNameToSend) {
-                    return $cmd->getName() === $commandNameToSend;
+                $elligibleCommands = array_filter($cmds, static function (cmd $cmd) use ($commandName) {
+                    return $cmd->getName() === $commandName;
                 });
 
                 if (empty($elligibleCommands)) {
                     $errorMessage =
                         sprintf(
                             'Commande "%s" introuvable pour l\'équipement "%s"',
-                            $commandNameToSend,
+                            $commandName,
                             $eqLogic->getName(),
                         );
                     massAction::logger('error', $errorMessage);
@@ -197,7 +202,7 @@ try {
                 } catch (Throwable $e) {
                     $errorMessage = sprintf(
                         'Erreur lors de l\'envoi de la commande "%s" pour l\'équipement "%s" : %s',
-                        $commandNameToSend,
+                        $commandName,
                         $eqLogic->getName(),
                         $e->getMessage()
                     );
