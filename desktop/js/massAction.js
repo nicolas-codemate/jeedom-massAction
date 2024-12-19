@@ -405,7 +405,7 @@ $(function () {
                     const select = document.getElementById('jmqttTemplateSelector');
                     select.add(new Option('{{Aucun}}', ''));
                     data.result.forEach(template => {
-                        select.add(new Option(template[0], template[1]));
+                        select.add(new Option(template[0], template[0]));
                     });
                 },
                 cache: false,

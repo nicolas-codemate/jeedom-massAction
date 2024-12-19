@@ -155,8 +155,9 @@ function applyTemplate(int $equipmentId, string $templateName, bool $keepCmd): b
 
         return false;
     }
+
     massAction::logger('info', sprintf(__("Application du template %s sur l'équipement %s", __FILE__), $templateName, $eqpt->getName()));
-    $eqpt->applyATemplate($template, init('topic'), $keepCmd);
+    $eqpt->applyATemplate($template, $eqpt->getTopic(), $keepCmd);
 
     return true;
 }
