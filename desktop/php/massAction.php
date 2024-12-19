@@ -31,6 +31,13 @@ try {
     $virtualPlugin = null;
 }
 
+$jMQTTPlugin = null;
+try {
+    $jMQTTPlugin = plugin::byId('jMQTT');
+} catch (\Throwable $e) {
+    $jMQTTPlugin = null;
+}
+
 ?>
 
 <div class="row row-overflow">
@@ -45,17 +52,20 @@ try {
                     <br>
                     <span>{{Actions}}</span>
                 </div>
-                <?php
-                if ($virtualPlugin) {
-                    ?>
+                <?php if ($virtualPlugin) { ?>
                     <div class="cursor eqLogicAction logoPrimary" data-action="addVirtual">
                         <i class="fas fa-plus-circle"></i>
                         <br>
                         <span>{{Virtuel}}</span>
                     </div>
-                    <?php
-                }
-                ?>
+                <?php } ?>
+                <?php if ($jMQTTPlugin) { ?>
+                <div class="cursor eqLogicAction logoPrimary" data-action="applyTemplate">
+                    <i class="fa fa-file-code"></i>
+                    <br>
+                    <span>{{Appliquer Template}}</span>
+                </div>
+                <?php } ?>
                 <div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf">
                     <i class="fas fa-wrench"></i>
                     <br>

@@ -139,9 +139,42 @@ function buildEquipments(jeeObject $parentObject, array $jMQTTs): array
     return $equipments;
 }
 
+function applyTemplate(int $equipmentId, string $templateName, bool $keepCmd): bool
+{
+    /** @var jMQTT $eqpt */
+    $eqpt = jMQTT::byId($equipmentId);
+    if (!is_object($eqpt) || $eqpt->getEqType_name() != jMQTT::class) {
+        massAction::logger('error', sprintf(__("Pas d'équipement jMQTT avec l'id %s", __FILE__), $equipmentId));
+
+        return false;
+    }
+    try {
+        $template = jMQTT::templateByName($templateName);
+    } catch (\Exception $exception) {
+        massAction::logger('error', sprintf(__("Pas de template jMQTT avec le nom %s", __FILE__), $templateName));
+
+        return false;
+    }
+    massAction::logger('info', sprintf(__("Application du template %s sur l'équipement %s", __FILE__), $templateName, $eqpt->getName()));
+    $eqpt->applyATemplate($template, init('topic'), $keepCmd);
+
+    return true;
+}
+
 try {
     require_once dirname(__FILE__).'/../../../../core/php/core.inc.php';
     include_file('core', 'authentification', 'php');
+
+    $jMQTTPlugin = null;
+    try {
+        $jMQTTPlugin = plugin::byId('jMQTT');
+    } catch (\Throwable $e) {
+        $jMQTTPlugin = null;
+    }
+
+    if ($jMQTTPlugin) {
+        require_once __DIR__.'/../../../jMQTT/core/class/jMQTT.class.php';
+    }
 
     if (!isConnect('admin')) {
         throw new Exception(__('401 - Accès non autorisé', __FILE__));
@@ -309,7 +342,6 @@ try {
                     ->setEqLogic_id($virtual->getId());
 
                 $virtualCmd->save();
-
             }
 
             db::commit();
@@ -347,8 +379,44 @@ try {
 
             return;
         }
+        case "applyTemplate":
+        {
+            $applyTemplateCommand = init('applyTemplateCommand');
+
+            $keepCommand = $applyTemplateCommand === '1';
+
+            // iterate over all equipements_xx key from $_POST and create an array of equipements with associated command name
+            $selectedEquipments = [];
+
+            foreach ($_POST as $key => $value) {
+                if (empty($value) || $value !== 'on') {
+                    continue;
+                }
+
+                if (preg_match('/^equipement_(\d+)$/', $key, $matches)) {
+                    $selectedEquipments[] = $matches[1];
+                }
+            }
+
+            DB::beginTransaction();
+            foreach ($selectedEquipments as $equipmentId) {
+                if (false === applyTemplate((int)$equipmentId, init('template'), $keepCommand)) {
+                    DB::rollback();
+                    ajax::error('Erreur lors de l\'application du template');
+                }
+            }
+            DB::commit();
+            ajax::success(sprintf('Template appliqué pour %d équipements', count($selectedEquipments)));
+        }
+        case "getTemplates":
+        {
+            if (null === $jMQTTPlugin) {
+                ajax::error('Le plugin jMQTT n\'est pas installé');
+            }
+            ajax::success(jMQTT::templateList());
+        }
         default:
-            throw new RuntimeException(__('Aucune méthode correspondante à', __FILE__).' : '.$action);
+            ajax::error(sprintf('Aucune méthode correspondante à "%s"', $action ?? 'N/A'));
     }
 } catch (Exception $e) {
     ajax::error(displayException($e), $e->getCode());

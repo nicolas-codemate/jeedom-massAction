@@ -16,7 +16,7 @@
 
 $(function () {
 
-        const initModal = function (size, title, message, ajaxAction) {
+        const initModal = function (size, title, message, ajaxAction, onShownCallback) {
             bootbox.confirm({
                 title,
                 message,
@@ -45,6 +45,14 @@ $(function () {
                     $('#virtualName').bind('input', function () {
                         toggleCommandForm();
                     });
+
+                    $('#jmqttTemplateSelector').bind('change', function () {
+                        toggleCommandForm();
+                    });
+
+                    if(onShownCallback) {
+                        onShownCallback();
+                    }
                 },
                 callback: function (result) {
                     if (!result) {
@@ -156,6 +164,12 @@ $(function () {
             if (!$selectedEquipmentsCommand.length) {
                 const hasVirtualName = $('#virtualName').val();
                 if (hasVirtualName) {
+                    enableAcceptButton();
+                    return;
+                }
+
+                const templateSelector = $('#jmqttTemplateSelector');
+                if (templateSelector.length && templateSelector.val() !== '') {
                     enableAcceptButton();
                     return;
                 }
@@ -372,6 +386,35 @@ $(function () {
             }
         };
 
+        const getTemplates = function () {
+
+            const formData = new FormData();
+            formData.append('action', 'getTemplates');
+
+            $.ajax({
+                url: 'plugins/massAction/core/ajax/massAction.ajax.php',
+                type: 'POST',
+                data: formData,
+                dataType: 'json',
+                async: false,
+                success: function (data) {
+                    if(data.state !== 'ok') {
+                        $.fn.showAlert({message: data.result, level: 'error'});
+                        return;
+                    }
+                    const select = document.getElementById('jmqttTemplateSelector');
+                    select.add(new Option('{{Aucun}}', ''));
+                    data.result.forEach(template => {
+                        select.add(new Option(template[0], template[1]));
+                    });
+                },
+                cache: false,
+                contentType: false,
+                processData: false,
+            });
+        };
+
+
         // build plugin index page with equipements list and current state
         const buildEqLogicContainer = function (data) {
             const container = $('#eqLogicThumbnailContainer');
@@ -495,6 +538,33 @@ $(function () {
 </form>
         `;
                 initModal('large', "Ajouter un virtuel", dialog_message, 'addVirtual');
+            });
+
+            $('.eqLogicAction[data-action=applyTemplate]').off('click').on('click', function () {
+                let dialog_message = `<form id="ajaxForm">`;
+                dialog_message += buildBaseModal(brokerSelector, objectParent);
+                dialog_message += `
+<div id="actionForm" style="display: none;">
+    <div class="row">
+        <div class="form-group col-md-12">
+            <label class="control-label">{{Utiliser un template :}}</label>
+            <select class="bootbox-input bootbox-input-select form-control" name="template" id="jmqttTemplateSelector">
+            </select>
+            
+            
+        <div class="form-group col-md-12 form-check">
+            <label class="control-label">{{Que voulez-vous faire des commandes existantes ?}}</label>
+            <div class="radio"><label><input type="radio" name="applyTemplateCommand" value="1" checked="checked">{{Les conserver / Mettre à jour}}</label></div>
+            <div class="radio"><label><input type="radio" name="applyTemplateCommand" value="0"> {{Les supprimer d'abord}}</label></div>
+        </div><br/>
+        
+        <div class="row" id="equimentsContainer" style="height:200px; overflow-y:scroll"></div>
+    </div>
+    <br/>
+</div>
+</form>
+        `;
+                initModal('large', "Appliquer un template", dialog_message, 'applyTemplate', getTemplates);
             });
         }
 
