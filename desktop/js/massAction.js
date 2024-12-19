@@ -268,15 +268,13 @@ $(function () {
             const buildEquipementsCheckbox = function (equipment) {
                 return `
 <div class="form-group">
-    <label for="equipement_${equipment.id}" class="control-label col-lg-8">
+    <label for="equipement_${equipment.id}" class="control-label col-lg-11">
         <img class="lazy" src="plugins/jMQTT/core/img/node_${equipment.icon}.svg" style="min-height: 24px; height:24px; width:auto;padding-top:1px;">
         <span>${equipment.fullHumanName}</span>
     </label>
-    <div class="col-lg-1">
+    <div class="col-lg-1" id="equipementCheckboxes">
         <input type="checkbox" id="equipement_${equipment.id}" class="form-control pull-right" name="equipement_${equipment.id}" style="margin-right:10px;" checked>
     </div>
-    <div class="col-lg-3">
-        &nbsp;
     </div>
 </div>
 `;
@@ -458,6 +456,18 @@ $(function () {
             }
         }
 
+        const bindCheckBoxSelectAll = function () {
+            $('#selectAll').on('click', function (e) {
+                e.preventDefault();
+                $('#equipementCheckboxes input[type=checkbox]').prop('checked', true);
+            });
+
+            $('#unselectAll').on('click', function (e) {
+                e.preventDefault();
+                $('#equipementCheckboxes input[type=checkbox]').prop('checked', false);
+            });
+        }
+
         const initPage = function () {
             $('#refreshEquipments').on('click', async function () {
                 await loadEquipmentsList();
@@ -531,13 +541,19 @@ $(function () {
             </p>
         </div>
         
-        <div class="row" id="equimentsContainer" style="height:300px; overflow-y:scroll"></div>
+       <div class="row">
+            <div class="col-md-12 text-right">
+                <a href="#" id="selectAll">{{Sélectionner tout}}</a> / <a href="#" id="unselectAll">{{Désélectionner tout}}</a>
+            </div>
+        </div>
+        
+        <div class="row panel" id="equimentsContainer" style="height:250px; overflow-y:scroll; padding:5px"></div>
     </div>
     <br/>
 </div>
 </form>
         `;
-                initModal('large', "Ajouter un virtuel", dialog_message, 'addVirtual');
+                initModal('large', "Ajouter un virtuel", dialog_message, 'addVirtual', bindCheckBoxSelectAll);
             });
 
             $('.eqLogicAction[data-action=applyTemplate]').off('click').on('click', function () {
@@ -558,13 +574,25 @@ $(function () {
             <div class="radio"><label><input type="radio" name="applyTemplateCommand" value="0"> {{Les supprimer d'abord}}</label></div>
         </div><br/>
         
-        <div class="row" id="equimentsContainer" style="height:200px; overflow-y:scroll"></div>
+        <hr>
+        
+       <div class="row">
+            <div class="col-md-12 text-right">
+                <a href="#" id="selectAll">{{Sélectionner tout}}</a> / <a href="#" id="unselectAll">{{Désélectionner tout}}</a>
+            </div>
+        </div>
+        <div class="row panel" id="equimentsContainer" style="height:250px; overflow-y:scroll;padding:5px;"></div>
     </div>
     <br/>
 </div>
 </form>
         `;
-                initModal('large', "Appliquer un template", dialog_message, 'applyTemplate', getTemplates);
+                const callback = function () {
+                    bindCheckBoxSelectAll();
+                    getTemplates()
+                }
+
+                initModal('large', "Appliquer un template", dialog_message, 'applyTemplate', callback);
             });
         }
 
