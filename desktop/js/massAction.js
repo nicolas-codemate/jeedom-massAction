@@ -110,6 +110,7 @@ $(function () {
             dialog_message += '<label class="control-label">{{Objet parent}}</label>';
             dialog_message += '<select class="bootbox-input bootbox-input-select form-control" id="modalParentObjectSelector" name="parentObject">';
             dialog_message += '<option value="">{{Aucun}}</option>';
+            dialog_message += `<option value="all" ${selectedObject === "all" ? 'selected' : ''}>{{Tous}}</option>`;
             $.each(objects, function (key, obj) {
                 dialog_message += `<option value="${key}" ${selectedObject === key ? 'selected' : ''}>${'&nbsp;'.repeat(obj.parentNumber)} ${obj.name} </option>`;
             });

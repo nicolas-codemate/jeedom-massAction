@@ -78,6 +78,8 @@ try {
                 <div class="input-group" style="margin:5px;">
                     <label for="parentObjectSelector">{{Objet parent}}</label>
                     <select id="parentObjectSelector" class="form-control" style="width: 100%;">
+                        <option value="">{{Aucun}}</option>
+                        <option value="all">{{Tous}}</option>
                         <?php
                         foreach ($objects as $objectId => $object) {
                             echo '<option value="'.$objectId.'">'.str_repeat('&nbsp;', $object['parentNumber']).$object['name'].'</option>';

@@ -86,57 +86,62 @@ function buildEquipments(jeeObject $parentObject, array $jMQTTs): array
             continue;
         }
 
-        $jMQTTObject = $jMQTT->getObject();
-        $fullHumanName = [$jMQTTObject->getName()];
-        while ($father = $jMQTTObject->getFather()) {
-            $fullHumanName[] = $father->getName();
-            $jMQTTObject = $father;
-        }
-
-        $fullHumanName = array_reverse($fullHumanName);
-        $fullHumanName[] = $jMQTT->getName();
-
-        $fullHumanName = implode(' - ', $fullHumanName);
-
-        $equipmentToAdd = [
-            'id' => $jMQTT->getId(),
-            'name' => $jMQTT->getName(),
-            'humanName' => $jMQTT->getHumanName(true, true),
-            'fullHumanName' => $fullHumanName,
-            'icon' => $jMQTT->getConfiguration('icone'),
-            'values' => [],
-            'commands' => [],
-        ];
-
-        /** @var cmd[] $commands */
-        $commands = $jMQTT->getCmd(null, null, true);
-        foreach ($commands as $command) {
-            if ($command->getType() === 'info') {
-                /** @var history[] $history */
-                $history = $command->getHistory();
-                $latestHistory = end($history);
-                if (false === $latestHistory) {
-                    continue;
-                }
-                $equipmentToAdd['values'][$command->getName()] = [
-                    'value' => $latestHistory->getValue(),
-                    'timestamp' => $latestHistory->getDatetime(),
-                ];
-            }
-
-            if ($command->getType() === 'action') {
-                // use key to ensure unicity in command name
-                $equipmentToAdd['commands'][$command->getName()] = $command->getName();
-            }
-        }
-
-        // drop the key
-        $equipmentToAdd['commands'] = array_values($equipmentToAdd['commands']);
-
-        $equipments[] = $equipmentToAdd;
+        $equipments[] = buildEquipment($jMQTT);
     }
 
     return $equipments;
+}
+
+function buildEquipment(jMQTT $jMQTT): array
+{
+    $fullHumanName = [$jMQTT->getName()];
+    $jMQTTObject = $jMQTT->getObject();
+    while ($father = $jMQTTObject->getFather()) {
+        $fullHumanName[] = $father->getName();
+        $jMQTTObject = $father;
+    }
+
+    $fullHumanName = array_reverse($fullHumanName);
+    $fullHumanName[] = $jMQTT->getName();
+
+    $fullHumanName = implode(' - ', $fullHumanName);
+
+    $equipment = [
+        'id' => $jMQTT->getId(),
+        'name' => $jMQTT->getName(),
+        'humanName' => $jMQTT->getHumanName(true, true),
+        'fullHumanName' => $fullHumanName,
+        'icon' => $jMQTT->getConfiguration('icone'),
+        'values' => [],
+        'commands' => [],
+    ];
+
+    /** @var cmd[] $commands */
+    $commands = $jMQTT->getCmd(null, null, true);
+    foreach ($commands as $command) {
+        if ($command->getType() === 'info') {
+            /** @var history[] $history */
+            $history = $command->getHistory();
+            $latestHistory = end($history);
+            if (false === $latestHistory) {
+                continue;
+            }
+            $equipment['values'][$command->getName()] = [
+                'value' => $latestHistory->getValue(),
+                'timestamp' => $latestHistory->getDatetime(),
+            ];
+        }
+
+        if ($command->getType() === 'action') {
+            // use key to ensure unicity in command name
+            $equipment['commands'][$command->getName()] = $command->getName();
+        }
+    }
+
+    // drop the key
+    $equipment['commands'] = array_values($equipment['commands']);
+
+    return $equipment;
 }
 
 function applyTemplate(int $equipmentId, string $templateName, bool $keepCmd): bool
@@ -366,6 +371,22 @@ try {
             if (empty($parentObjectId)) {
                 /** @var jeeObject $parentObject */
                 $parentObject = jeeObject::rootObject(false, true);
+            } elseif ('all' === $parentObjectId) {
+                $jMQTTs = jMQTT::byBrkId($brokerId);
+                $equipments = [];
+                foreach ($jMQTTs as $JMQTT) {
+                    $equipments[] = buildEquipment($JMQTT);
+                }
+
+                ajax::success([
+                    'id' => '0',
+                    'name' => 'all',
+                    'equipments' => $equipments,
+                    'countEquipments' => count($equipments),
+                    'child' => [],
+                ]);
+
+                return;
             } else {
                 /** @var jeeObject $parentObject */
                 $parentObject = jeeObject::byId($parentObjectId);
